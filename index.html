@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Louis's Office Escape RPG</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #d4d4d4;
+            font-family: 'Fira Code', monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            border: 4px solid #333;
+            border-radius: 4px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #1e1e1e;
+            image-rendering: pixelated; /* Crucial for retro look */
+        }
+
+        /* UI OVERLAY FOR DIALOG AND MENUS */
+        #ui-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 140px;
+            pointer-events: none;
+            display: none; /* Hidden by default */
+        }
+
+        .dialog-box {
+            background: #fff;
+            border: 4px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px;
+            height: calc(100% - 20px);
+            box-sizing: border-box;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: #333;
+            line-height: 1.8;
+            position: relative;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+            pointer-events: auto;
+        }
+
+        .battle-menu {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            height: 100%;
+        }
+
+        .battle-btn {
+            background: #f0f0f0;
+            border: 2px solid #333;
+            padding: 10px;
+            cursor: pointer;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            text-align: left;
+            transition: background 0.1s;
+        }
+
+        .battle-btn:hover {
+            background: #d4d4d4;
+            border-color: #000;
+        }
+        
+        .battle-btn:before {
+            content: "> ";
+            opacity: 0;
+        }
+        .battle-btn:hover:before {
+            opacity: 1;
+        }
+
+        #health-overlay {
+            position: absolute;
+            top: 10px; /* Moved up slightly */
+            left: 10px;
+            width: calc(100% - 20px);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start; /* Added to prevent stretching */
+            pointer-events: none;
+            display: none;
+        }
+
+        .hp-box {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #333; /* Thinner border */
+            padding: 6px 8px; /* Compact padding */
+            border-radius: 4px;
+            width: 140px; /* Much narrower */
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px; /* Smaller font */
+            color: #333;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.3); /* Smaller shadow */
+        }
+
+        .hp-bar-bg {
+            width: 100%;
+            height: 6px; /* Thinner bar */
+            background: #ccc;
+            margin-top: 4px;
+            border: 1px solid #000;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: #2ecc71;
+            width: 100%;
+            transition: width 0.5s;
+        }
+
+        /* GAME OVER SCREEN */
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            display: none;
+            text-align: center;
+        }
+
+        #game-over-screen h1 {
+            font-family: 'Press Start 2P', cursive;
+            color: #e74c3c;
+            font-size: 40px;
+            margin-bottom: 20px;
+            text-shadow: 4px 4px 0 #000;
+        }
+
+        #game-over-screen p {
+            font-family: 'Fira Code', monospace;
+            color: #fff;
+            font-size: 14px;
+            margin: 10px;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* Scanlines for CRT effect */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <canvas id="gameCanvas" width="640" height="480"></canvas>
+        <div class="scanlines"></div>
+
+        <!-- GAME OVER SCREEN -->
+        <div id="game-over-screen">
+            <h1>BURNOUT</h1>
+            <p id="go-killer" style="color: #f1c40f; font-family: 'Press Start 2P'; font-size: 12px; margin-bottom: 30px;"></p>
+            <p id="go-reason"></p>
+            <button class="battle-btn" onclick="Game.restart()" style="margin-top: 40px; text-align: center;">TRY AGAIN</button>
+        </div>
+
+        <!-- Combat HUD -->
+        <div id="health-overlay">
+            <div class="hp-box" id="enemy-hp-box" style="display:none;">
+                <div id="enemy-name">MANAGER</div>
+                <div class="hp-bar-bg"><div id="enemy-hp-bar" class="hp-bar-fill"></div></div>
+            </div>
+            <div class="hp-box" id="player-hp-box" style="display:none; margin-top: 150px;">
+                <div>LOUIS (YOU)</div>
+                <div class="hp-bar-bg"><div id="player-hp-bar" class="hp-bar-fill"></div></div>
+                <div id="player-hp-text" style="margin-top:5px; font-size: 8px;">100/100 SANITY</div>
+            </div>
+        </div>
+
+        <!-- Dialog / Menu -->
+        <div id="ui-layer">
+            <div class="dialog-box" id="dialog-text">
+                <!-- Text injected here -->
+            </div>
+            <div class="dialog-box" id="battle-controls" style="display:none;">
+                <div class="battle-menu">
+                    <div class="battle-btn" onclick="Game.battleAction('attack')">GIT PUSH -F</div>
+                    <div class="battle-btn" onclick="Game.battleAction('heal')">DRINK COFFEE</div>
+                    <div class="battle-btn" onclick="Game.battleAction('special')">REFACTOR</div>
+                    <div class="battle-btn" onclick="Game.battleAction('run')">IGNORE SLACK</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+/**
+ * GAME ENGINE CONSTANTS
+ */
+const TILE_SIZE = 40; // Size of grid tiles
+const VIEW_W = 16; // Viewport width in tiles
+const VIEW_H = 12; // Viewport height in tiles
+const MAP_WIDTH = 60; // Increased map width for scrolling
+const MAP_HEIGHT = 15;
+
+/**
+ * ASSET GENERATION (Pixel Art Strings)
+ */
+const PALETTE = {
+    _: null, // Transparent
+    W: '#ffffff', // White
+    K: '#111111', // Black
+    S: '#ffdbac', // Skin
+    H: '#5d4037', // Brown Hair
+    B: '#000080', // Navy
+    G: '#556b2f', // Green
+    J: '#2c3e50', // Jeans
+    R: '#c0392b', // Red Tie
+    D: '#34495e', // Suit
+    F: '#bdc3c7', // Floor Light
+    O: '#e67e22', // Orange/Red Hair (Louis)
+    L: '#2ecc71', // Grass/Cables
+    A: '#95a5a6', // Wall
+    T: '#7f8c8d', // Dark Grey
+    P: '#27ae60', // Plant Green
+    C: '#3498db', // Water Cooler Blue
+    X: '#e74c3c'  // Red Eyes/Joint Tip
+};
+
+// Helper: Draw Pixel Grid
+function drawGrid(ctx, grid, x, y, size) {
+    for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+            const char = grid[r][c];
+            if (PALETTE[char]) {
+                ctx.fillStyle = PALETTE[char];
+                ctx.fillRect(x + c * size, y + r * size, size, size);
+            }
+        }
+    }
+}
+
+// Map Sprites (Top-Down)
+const SPRITES = {
+    // Environment
+    floor: (ctx, x, y) => {
+        // Office Carpet Texture
+        ctx.fillStyle = '#34495e'; // Dark base
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        ctx.fillStyle = '#2c3e50'; // Chequer pattern
+        ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        // Noise/Speckles
+        ctx.fillStyle = '#3d566e';
+        ctx.fillRect(x+10, y+10, 4, 4);
+        ctx.fillRect(x+25, y+25, 4, 4);
+        ctx.fillRect(x+8, y+28, 4, 4);
+    },
+    wall: (ctx, x, y) => {
+        // 3D Wall Effect
+        ctx.fillStyle = '#7f8c8d'; // Top face
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+        
+        // Front Face
+        ctx.fillStyle = '#95a5a6';
+        ctx.fillRect(x, y + 10, TILE_SIZE, TILE_SIZE - 10);
+        
+        // Shadow/Baseboard
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+        
+        // Vertical seam
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillRect(x + TILE_SIZE - 2, y + 10, 2, TILE_SIZE - 10);
+    },
+    desk: (ctx, x, y) => {
+        // Floor under desk
+        SPRITES.floor(ctx, x, y);
+        
+        // Table top
+        ctx.fillStyle = '#e67e22'; // Warmer wood
+        ctx.fillRect(x+4, y+12, TILE_SIZE-8, TILE_SIZE-16);
+        ctx.fillStyle = '#d35400'; // Side
+        ctx.fillRect(x+4, y+TILE_SIZE-4, TILE_SIZE-8, 4);
+        
+        // Laptop
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(x+12, y+15, 16, 10);
+        ctx.fillStyle = '#3498db'; // Screen glow
+        ctx.fillRect(x+14, y+17, 12, 6);
+    },
+    plant: (ctx, x, y) => {
+        SPRITES.floor(ctx, x, y);
+        const grid = [
+            "___PP___",
+            "__PPPP__",
+            "_PPPPPP_",
+            "__PPPP__",
+            "___KK___",
+            "__KKKK__",
+            "__KKKK__"
+        ];
+        drawGrid(ctx, grid, x + 8, y + 10, 3);
+    },
+    cooler: (ctx, x, y) => {
+        SPRITES.floor(ctx, x, y);
+        // Bottle
+        ctx.fillStyle = 'rgba(52, 152, 219, 0.6)';
+        ctx.fillRect(x+12, y+5, 16, 15);
+        // Base
+        ctx.fillStyle = '#ecf0f1';
+        ctx.fillRect(x+10, y+20, 20, 18);
+        // Tap
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(x+18, y+25, 4, 4);
+    },
+    door: (ctx, x, y) => {
+        SPRITES.wall(ctx, x, y); // Wall bg
+        ctx.fillStyle = '#2c3e50'; // Door Frame
+        ctx.fillRect(x+6, y+4, TILE_SIZE-12, TILE_SIZE-4);
+        ctx.fillStyle = '#34495e'; // Door
+        ctx.fillRect(x+8, y+6, TILE_SIZE-16, TILE_SIZE-6);
+        
+        // Exit Sign
+        ctx.fillStyle = '#27ae60'; 
+        ctx.fillRect(x+10, y-5, 20, 8);
+        ctx.fillStyle = '#fff';
+        ctx.font = '6px Arial';
+        ctx.fillText("EXIT", x+12, y+1);
+    },
+    
+    // Characters (Map View - Pixel Grid)
+    louis_map: (ctx, x, y) => {
+        const grid = [
+            "___KKKK___", // Black Hair
+            "__KSSSSK__",
+            "__SKSKSS__",
+            "__SSSSSS__",
+            "__BBWWRR__", // French Flag T-Shirt
+            "__BBWWRR__",
+            "__JJJJJJ__",
+            "__JJ__JJ__"
+        ];
+        drawGrid(ctx, grid, x + 5, y + 4, 3);
+    },
+    andrew_map: (ctx, x, y) => { // Black Shirt
+        const grid = [
+            "___KKKK___",
+            "__KSSSSK__",
+            "__SKSKSK__",
+            "__SSSSSS__",
+            "__KKKKKK__",
+            "__KKKKKK__",
+            "__JJJJJJ__",
+            "__JJ__JJ__"
+        ];
+        drawGrid(ctx, grid, x + 5, y + 4, 3);
+    },
+    piero_map: (ctx, x, y) => { // Green Hoodie, Long hair
+        const grid = [
+            "__HHHHHH__",
+            "__HSSSSH__",
+            "__SSSSSS__",
+            "__GGGGGG__",
+            "__GGGGGG__",
+            "__GGGGGG__",
+            "__JJJJJJ__",
+            "__JJ__JJ__"
+        ];
+        drawGrid(ctx, grid, x + 5, y + 4, 3);
+    },
+    marco_map: (ctx, x, y) => { // Suit
+        const grid = [
+            "__KKKKKK__",
+            "__SSSSSS__",
+            "__SSSSSS__",
+            "__DDDDDD__",
+            "__DDRRDD__",
+            "__DDDDDD__",
+            "__DDDDDD__",
+            "__DD__DD__"
+        ];
+        drawGrid(ctx, grid, x + 5, y + 4, 3);
+    }
+};
+
+/**
+ * BATTLE SPRITE RENDERER
+ * High Resolution (20x20 Grids)
+ */
+function drawBattleSprite(ctx, type, x, y, scale=8) {
+    const louisBack = [ // Black hair, French Flag shirt
+        ".......KKKKKK.......",
+        ".....KKSSSSSSKK.....",
+        "....KSSSSSSSSSSK....",
+        "....SSSSSSSSSSSS....",
+        "....SSSSSSSSSSSS....",
+        "...BBBBBWWWWRRRRR...", // Blue
+        "...BBBBBWWWWRRRRR...", // White
+        "...BBBBBWWWWRRRRR...", // Red
+        "...BBBBBWWWWRRRRR...",
+        "...BBBBBWWWWRRRRR...",
+        "...BBBBBWWWWRRRRR...",
+        "...BBBBBWWWWRRRRR...",
+        "...BBBBBWWWWRRRRR...",
+        "....JJJJJJJJJJJJ....",
+        "....JJJJJJJJJJJJ....",
+        "....JJJJ....JJJJ....",
+        "....JJJJ....JJJJ....",
+        "....JJJJ....JJJJ....",
+        "...KKKK......KKKK...",
+        "...KKKK......KKKK..."
+    ];
+
+    const marco = [ // Balding, Suit
+        "....................",
+        "....KKK......KKK....", // Hair sides
+        "...KSSSSSSSSSSSSK...", // Bald top
+        "...KSSSSSSSSSSSSK...",
+        "...S--S--SS--S--S...", // Forehead wrinkles
+        "...S-KK--SS--KK-S...", // Eyebrows
+        "...S--K--SS--K--S...", // Eyes
+        "....SSSSSSSSSSSS....",
+        "....DDDDDDDDDDD.....",
+        "....DDDDWRWDDDD.....",
+        "....DDDDWRWDDDD.....",
+        "....DDDDDDDDDDD.....",
+        "....DDDDDDDDDDD.....",
+        "....DDDDDDDDDDD.....",
+        "....DDDDDDDDDDD.....",
+        ".....DD.....DD......",
+        ".....DD.....DD......",
+        ".....DD.....DD......"
+    ];
+
+    const piero = [ // Tall, Long hair, Red eyes, Smoking
+        "......HHHHHH........",
+        ".....HSSSSSSH.......",
+        "....HSSSSSSSSH......", // Tall face
+        "....HSSSSSSSSH......",
+        "....HSXSSSSXSH......", // Red eyes (X)
+        "....SSSSSSSSSH......",
+        "....HHHSSKWXHH......", // Mouth with Joint (W=Paper, X=Fire)
+        "....HHHGGGGHHH......",
+        "....HHGGGGGGHH......",
+        "......GGGGGG........", // Thinner body
+        "......GGGGGG........",
+        "......GGGGGG........",
+        "......JJJJJJ........",
+        "......JJJJJJ........",
+        "......JJ..JJ........",
+        "......JJ..JJ........",
+        "......JJ..JJ........"
+    ];
+
+    const andrew = [ // Metal Shirt, Massive Hair
+        ".....KKKKKKKKK......",
+        "....KKKKKKKKKKK.....",
+        "....KKKKKKKKKKK.....",
+        "....KKKKKKKKKKK.....", // Hair covers eyes
+        "....KKKKSSSKKKK.....", // Just nose visible
+        "....KKKKKKKKKKK.....",
+        "....KKTTTTTTTKK.....", // Logo
+        "....KKKTTTTTKKK.....",
+        "....KKKKTTTKKKK.....",
+        "....KKKKKKKKKKK.....",
+        "....KKK.....KKK.....",
+        "....KKK.....KKK.....",
+        "....JJJ.....JJJ.....",
+        "....JJJ.....JJJ.....",
+        "....JJ.......JJ.....",
+        "....JJ.......JJ.....",
+        "...KKK.......KKK...."
+    ];
+
+    let grid = louisBack; // Default
+    if (type === 'marco') grid = marco;
+    if (type === 'piero') grid = piero;
+    if (type === 'andrew') grid = andrew;
+
+    drawGrid(ctx, grid, x, y, scale);
+}
+
+
+/**
+ * AUDIO SYSTEM
+ */
+const AudioSys = {
+    ctx: null,
+    init: function() {
+        window.AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+    },
+    playTone: function(freq, type, duration, when = 0) {
+        if (!this.ctx) return;
+        const t = when || this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + duration);
+    },
+    step: function() { this.playTone(100, 'triangle', 0.05); },
+    bump: function() { this.playTone(50, 'sawtooth', 0.1); },
+    battleIntro: function() { 
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.playTone(150, 'square', 0.1, now);
+        this.playTone(150, 'square', 0.1, now + 0.15);
+        this.playTone(150, 'square', 0.1, now + 0.30);
+        this.playTone(440, 'square', 0.2, now + 0.5);
+        this.playTone(392, 'square', 0.2, now + 0.7);
+        this.playTone(440, 'square', 0.4, now + 0.9);
+    },
+    attack: function() { this.playTone(150, 'sawtooth', 0.1); },
+    playMarseillaise: function() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        // Simplified Anthem
+        const notes = [
+            392, 392, 523, 523, 659, 784, // G G C C E G
+            1046, 880, 523, 784, // HighC A C G
+            659, 523, 587, 392   // E C D G
+        ];
+        const timing = [0.2, 0.2, 0.4, 0.4, 0.4, 0.6, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.6, 0.8];
+        
+        let t = now;
+        notes.forEach((freq, i) => {
+            this.playTone(freq, 'triangle', timing[i], t);
+            t += timing[i] + 0.05;
+        });
+    },
+    win: function() { 
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        this.playTone(523, 'sine', 0.1, now); // C
+        this.playTone(659, 'sine', 0.1, now + 0.1); // E
+        this.playTone(784, 'sine', 0.2, now + 0.2); // G
+        this.playTone(1046, 'sine', 0.4, now + 0.4); // High C
+    }
+};
+
+const MAP_DATA = [];
+
+// Generate Map Procedurally for Length
+function generateMap() {
+    for(let y=0; y<MAP_HEIGHT; y++) {
+        let row = [];
+        for(let x=0; x<MAP_WIDTH; x++) {
+            // Default Floor
+            let tile = 0; 
+            
+            // Walls top and bottom
+            if (y === 0 || y === MAP_HEIGHT - 1) tile = 1;
+            else if (y === 1 || y === MAP_HEIGHT - 2) tile = 1; // Thick walls
+            
+            // Start/End Walls
+            if (x === 0 || x === MAP_WIDTH - 1) tile = 1;
+
+            // Corridor Features (every 10 tiles)
+            if (tile === 0 && x > 5 && x < MAP_WIDTH - 5) {
+                // Desks on top side
+                if (y === 3 || y === 4) {
+                    if (x % 6 !== 0) tile = 2; // Blocks of desks
+                }
+                // Desks on bottom side
+                if (y === 10 || y === 11) {
+                    if (x % 6 !== 0) tile = 2;
+                }
+                
+                // Plants and Coolers
+                if ((y === 2 || y === 12) && x % 8 === 0) tile = 4; // Plant
+                if ((y === 2 || y === 12) && x % 14 === 0) tile = 5; // Cooler
+            }
+
+            // Exit
+            if (x === MAP_WIDTH - 2 && y === 7) tile = 9;
+
+            row.push(tile);
+        }
+        MAP_DATA.push(row);
+    }
+}
+generateMap();
+
+const ENEMY_MOVES = {
+    marco: [ // Buzzwords & French Jokes
+        { name: "Generative Synergy", dmg: 30, msg: "Marco says 'AI' 50 times in one breath. You feel dizzy." },
+        { name: "Strategic Pivot", dmg: 15, msg: "Marco pivots the roadmap to 'Hyper-Scale'. Your work is deleted." },
+        { name: "Paradigm Shift", dmg: 20, msg: "Marco disrupts the workflow with a paradigm shift." },
+        { name: "LLM Hallucination", dmg: 25, msg: "Marco's AI strategy is pure hallucination. Sanity damage!" },
+        { name: "Blockchain AI", dmg: 35, msg: "Marco combines Crypto and AI. It's super effective (and stupid)." },
+        { name: "White Flag", dmg: 15, msg: "Marco asks: 'Is that a white flag in your commit history?'" },
+        { name: "Strike Action", dmg: 20, msg: "Marco yells: 'Are you on strike AGAIN? Get back to work!'" },
+        { name: "Golden Parachute", dmg: 40, selfHeal: true, msg: "Marco secures a bonus. Health restored!" }
+    ],
+    andrew: [ // .MD Files & French Jokes
+        { name: "README.md", dmg: 20, msg: "Andrew forces you to read the 10,000 line README.md." },
+        { name: "CHANGELOG.md", dmg: 15, msg: "Andrew found a typo in CHANGELOG.md. Fix it now." },
+        { name: "CONTRIBUTING.md", dmg: 25, msg: "You violated the rules in CONTRIBUTING.md. Shame!" },
+        { name: "TODO.md", dmg: 30, msg: "Andrew added 50 new items to TODO.md. You are overwhelmed." },
+        { name: "AZERTY Error", dmg: 18, msg: "Andrew mocks your weird French keyboard. 'Where is the W?!'" },
+        { name: "August Break", dmg: 22, msg: "Andrew asks: 'You taking the whole month off? Typical.'" },
+        { name: "Server Reboot", dmg: 30, selfHeal: true, msg: "Andrew updated STATUS.md to 'Operational'." }
+    ],
+    piero: [ // Screaming & French Jokes
+        { name: "WHO TOUCHED IT?!", dmg: 40, msg: "PIERO SCREAMS: 'WHO TOUCHED MY COMPONENT?!'" },
+        { name: "PROD IS DOWN!!", dmg: 45, msg: "PIERO YELLS: 'THE DATABASE IS ON FIRE!!'" },
+        { name: "WHY???", dmg: 20, msg: "PIERO SCREAMS: 'WHY DID YOU USE A GLOBAL VARIABLE??'" },
+        { name: "Omelette du Fromage", dmg: 35, msg: "Piero whispers: 'Omelette du... Fromage'. You cringe hard." },
+        { name: "Baguette Slap", dmg: 25, msg: "Piero slaps you with a stale baguette. Crusty damage!" },
+        { name: "Shower Time", dmg: 15, msg: "Piero offers you deodorant. 'It's been a while, Louis.'" },
+        { name: "Smoke Break", dmg: -40, msg: "Piero says: 'Chill bro...' and passes the boof. Huge Heal." },
+        { name: "Munchies", dmg: 30, selfHeal: true, msg: "Piero eats an entire pizza. He feels great." }
+    ]
+};
+
+/**
+ * GAME STATE MANAGEMENT
+ */
+const Game = {
+    canvas: document.getElementById('gameCanvas'),
+    ctx: document.getElementById('gameCanvas').getContext('2d'),
+    
+    state: 'MAP', // MAP, TRANSITION, BATTLE, GAMEOVER
+    
+    player: {
+        x: 2, y: 7, // Start in corridor
+        hp: 100, maxHp: 100,
+        name: "Louis"
+    },
+    
+    // Camera Position
+    camera: { x: 0, y: 0 },
+    
+    // Enemy AI Timer
+    enemyMoveTimer: 0,
+
+    // Map enemies at spread out positions
+    mapEnemies: [
+        { id: 'andrew', name: 'ANDREW', x: 15, y: 7, defeated: false, intro: "Andrew blocks the path! Code Review time!" },
+        { id: 'piero', name: 'PIERO', x: 30, y: 7, defeated: false, intro: "Piero is merging to master!" },
+        { id: 'marco', name: 'MARCO', x: 45, y: 7, defeated: false, intro: "Marco demands a pivot!" }
+    ],
+    
+    battle: {
+        enemy: null,
+        turn: 'PLAYER',
+        transitionTimer: 0,
+        transitionPhase: 0,
+        waitingForContinue: false,
+        lastEnemyMove: null // Track last move
+    },
+
+    init: function() {
+        AudioSys.init();
+        this.inputHandler();
+        this.loop();
+    },
+
+    updateEnemies: function() {
+        this.enemyMoveTimer++;
+        if (this.enemyMoveTimer < 30) return; // Move every 30 frames (approx 0.5s)
+        this.enemyMoveTimer = 0;
+
+        this.mapEnemies.forEach(e => {
+            if (e.defeated) return;
+
+            // Calculate distance to player
+            const dx = this.player.x - e.x;
+            const dy = this.player.y - e.y;
+            const dist = Math.abs(dx) + Math.abs(dy);
+
+            // Aggro Range (6 tiles)
+            if (dist < 6) {
+                // Determine direction
+                let moveX = 0;
+                let moveY = 0;
+
+                // Simple axis-aligned movement
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    moveX = Math.sign(dx);
+                } else {
+                    moveY = Math.sign(dy);
+                }
+
+                // Check collisions for next tile
+                const nextX = e.x + moveX;
+                const nextY = e.y + moveY;
+
+                // Check bounds
+                if (nextX < 0 || nextX >= MAP_WIDTH || nextY < 0 || nextY >= MAP_HEIGHT) return;
+
+                // Check Map Objects (Walls/Desks/etc)
+                const tile = MAP_DATA[nextY][nextX];
+                if (tile === 1 || tile === 2 || tile === 4 || tile === 5 || tile === 9) return;
+
+                // Check other enemies (don't stack)
+                if (this.mapEnemies.some(other => !other.defeated && other !== e && other.x === nextX && other.y === nextY)) return;
+
+                // Move
+                e.x = nextX;
+                e.y = nextY;
+
+                // Check Collision with Player (Trigger Fight)
+                if (e.x === this.player.x && e.y === this.player.y) {
+                    this.triggerTransition(e);
+                }
+            }
+        });
+    },
+
+    inputHandler: function() {
+        const proceedBattle = () => {
+            if (this.state === 'BATTLE' && this.battle.waitingForContinue) {
+                this.battle.waitingForContinue = false;
+                this.battle.turn = 'PLAYER';
+                document.getElementById('battle-controls').style.display = 'block';
+                document.getElementById('dialog-text').style.display = 'none';
+            }
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (this.state === 'MAP') {
+                let dx = 0, dy = 0;
+                if (e.key === 'ArrowUp') dy = -1;
+                if (e.key === 'ArrowDown') dy = 1;
+                if (e.key === 'ArrowLeft') dx = -1;
+                if (e.key === 'ArrowRight') dx = 1;
+                if (dx !== 0 || dy !== 0) this.movePlayer(dx, dy);
+            } else if (this.state === 'BATTLE') {
+                if (e.key === ' ' || e.key === 'Enter') proceedBattle();
+            }
+        });
+
+        window.addEventListener('click', () => {
+            if (this.state === 'BATTLE') proceedBattle();
+        });
+        
+        window.addEventListener('touchstart', (e) => {
+             if (this.state === 'BATTLE') proceedBattle();
+        });
+    },
+
+    movePlayer: function(dx, dy) {
+        const newX = this.player.x + dx;
+        const newY = this.player.y + dy;
+        if (newX < 0 || newX >= MAP_WIDTH || newY < 0 || newY >= MAP_HEIGHT) return;
+        
+        const tile = MAP_DATA[newY][newX];
+        // 0=Floor, 1=Wall, 2=Desk, 4=Plant, 5=Cooler, 9=Door
+        if (tile === 1 || tile === 2 || tile === 4 || tile === 5) { AudioSys.bump(); return; }
+
+        // Check for enemies
+        const enemy = this.mapEnemies.find(e => e.x === newX && e.y === newY && !e.defeated);
+        if (enemy) {
+            this.triggerTransition(enemy);
+            return;
+        }
+
+        this.player.x = newX;
+        this.player.y = newY;
+        AudioSys.step();
+        
+        // Update Camera
+        this.updateCamera();
+
+        if (tile === 9) {
+            this.victory();
+            return;
+        }
+    },
+
+    updateCamera: function() {
+        const canvasW = 640;
+        const canvasH = 480;
+        
+        // Center on player
+        let targetX = (this.player.x * TILE_SIZE) - (canvasW / 2) + (TILE_SIZE / 2);
+        let targetY = (this.player.y * TILE_SIZE) - (canvasH / 2) + (TILE_SIZE / 2);
+
+        // Clamp to map bounds
+        const maxX = (MAP_WIDTH * TILE_SIZE) - canvasW;
+        const maxY = (MAP_HEIGHT * TILE_SIZE) - canvasH;
+        
+        this.camera.x = Math.max(0, Math.min(targetX, maxX));
+        this.camera.y = Math.max(0, Math.min(targetY, maxY));
+    },
+
+    triggerTransition: function(enemy) {
+        this.state = 'TRANSITION';
+        this.battle.transitionTimer = 180; // Frames
+        this.battle.waitingForContinue = false;
+        this.battle.lastEnemyMove = null; // Reset move history
+        AudioSys.battleIntro();
+        
+        // Prepare Enemy based on map encounter
+        this.battle.enemy = { 
+            id: enemy.id, 
+            name: enemy.name,
+            hp: enemy.id === 'marco' ? 100 : 70, 
+            maxHp: enemy.id === 'marco' ? 100 : 70, 
+            intro: enemy.intro
+        }; 
+        this.battle.turn = 'PLAYER';
+    },
+
+    drawTransition: function() {
+        this.ctx.fillStyle = '#000';
+        
+        // Flash effect
+        if (this.battle.transitionTimer > 150) {
+             if (Math.floor(this.battle.transitionTimer / 5) % 2 === 0) {
+                 this.ctx.fillRect(0,0,640,480);
+             }
+             return;
+        }
+
+        // Draw Background
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.fillRect(0,0,640,480);
+
+        // Draw Enemy Portrait Large
+        drawBattleSprite(this.ctx, this.battle.enemy.id, 240, 100, 10);
+
+        // Draw Text
+        this.ctx.fillStyle = '#fff';
+        this.ctx.font = '20px "Press Start 2P"';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText("VS", 320, 240);
+        
+        this.ctx.font = '14px "Press Start 2P"';
+        this.ctx.fillStyle = '#f1c40f';
+        this.ctx.fillText(this.battle.enemy.intro, 320, 380);
+        this.ctx.textAlign = 'left';
+    },
+
+    startBattle: function() {
+        this.state = 'BATTLE';
+        document.getElementById('ui-layer').style.display = 'block';
+        document.getElementById('health-overlay').style.display = 'flex';
+        document.getElementById('enemy-hp-box').style.display = 'block';
+        document.getElementById('player-hp-box').style.display = 'block';
+        
+        document.getElementById('battle-controls').style.display = 'block';
+        document.getElementById('dialog-text').style.display = 'none';
+
+        this.updateHealthUI();
+        this.logText(`What will Louis do?`);
+    },
+
+    battleAction: function(action) {
+        if (this.battle.turn !== 'PLAYER') return;
+        let dmg = 0;
+        let msg = "";
+
+        if (action === 'attack') {
+            dmg = Math.floor(Math.random() * 20) + 15;
+            msg = "Louis used GIT PUSH --FORCE!";
+            AudioSys.attack();
+        } else if (action === 'heal') {
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + 50);
+            msg = "Louis drank Americano. Motivation restored!";
+            this.nextTurn(msg, 0);
+            return;
+        } else if (action === 'special') {
+            dmg = Math.floor(Math.random() * 30) + 10;
+            msg = "Louis REFACTORED the legacy code!";
+        } else if (action === 'run') {
+            msg = "Cannot run! They are blocking the door!";
+            this.nextTurn(msg, 0);
+            return;
+        }
+
+        this.battle.enemy.hp -= dmg;
+        this.nextTurn(msg, 0);
+    },
+
+    enemyTurn: function() {
+        if (this.battle.enemy.hp <= 0) {
+            this.endBattle(false);
+            return;
+        }
+
+        const moves = ENEMY_MOVES[this.battle.enemy.id];
+        
+        // --- SMART AI LOGIC ---
+        let chosenMove = null;
+        
+        // 1. Check if Enemy is dying (HP < 30%) -> Prioritize Healing
+        const isLowHp = this.battle.enemy.hp < (this.battle.enemy.maxHp * 0.3);
+        
+        if (isLowHp) {
+            // Filter for healing moves that weren't used last turn
+            const healMoves = moves.filter(m => m.selfHeal && m.name !== this.battle.lastEnemyMove);
+            // 70% chance to heal if available
+            if (healMoves.length > 0 && Math.random() < 0.7) {
+                chosenMove = healMoves[Math.floor(Math.random() * healMoves.length)];
+            }
+        }
+
+        // 2. If no move selected yet, pick random move (excluding last move)
+        if (!chosenMove) {
+            let availableMoves = moves.filter(m => m.name !== this.battle.lastEnemyMove);
+            
+            // Fallback just in case (shouldn't happen with large movesets)
+            if (availableMoves.length === 0) availableMoves = moves;
+
+            chosenMove = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+        }
+        
+        // Remember this move for next turn
+        this.battle.lastEnemyMove = chosenMove.name;
+        
+        // --- EXECUTE MOVE ---
+        
+        if (chosenMove.selfHeal) {
+            // Enemy Heals Self
+            const healAmount = chosenMove.dmg;
+            this.battle.enemy.hp = Math.min(this.battle.enemy.maxHp, this.battle.enemy.hp + healAmount);
+            // Visual feedback for heal (Green flash logic could go here)
+        } else if (chosenMove.dmg < 0) {
+            // Healing Player (Piero's Special Herb)
+             this.player.hp -= chosenMove.dmg; // Double negative = add
+             if (this.player.hp > this.player.maxHp) this.player.hp = this.player.maxHp;
+        } else {
+            // Damage Player
+             this.player.hp -= chosenMove.dmg;
+             AudioSys.bump();
+             document.getElementById('game-wrapper').classList.add('shake');
+             setTimeout(() => document.getElementById('game-wrapper').classList.remove('shake'), 500);
+        }
+
+        const msg = chosenMove.msg;
+        this.updateHealthUI();
+        this.logText(msg + " (Click to continue)");
+        
+        // Force dialog visibility so user can read the attack
+        document.getElementById('battle-controls').style.display = 'none';
+        document.getElementById('dialog-text').style.display = 'block';
+
+        if (this.player.hp <= 0) {
+            setTimeout(() => {
+                this.gameOver(msg);
+            }, 1000);
+            return;
+        }
+
+        // Wait for player input
+        this.battle.waitingForContinue = true;
+    },
+
+    gameOver: function(lastHitMsg) {
+        this.state = 'GAMEOVER';
+        document.getElementById('ui-layer').style.display = 'none';
+        document.getElementById('health-overlay').style.display = 'none';
+        
+        const screen = document.getElementById('game-over-screen');
+        screen.style.display = 'flex';
+        
+        // Reset styles for Loss
+        const h1 = screen.querySelector('h1');
+        h1.innerText = "BURNOUT";
+        h1.style.color = '#e74c3c'; // Red
+        
+        document.getElementById('go-killer').innerText = "FATAL ERROR: " + this.battle.enemy.name;
+        
+        const reasons = [
+            "Louis is now maintaining legacy COBOL code on Sundays.",
+            "Burnout achieved. Louis moved to a goat farm in Ardèche.",
+            "The deadline was yesterday. You are now a Project Manager.",
+            "git push --force failed. You have been promoted to Customer Support.",
+            "Louis accepted the offer from the recruiter on LinkedIn.",
+            "You forgot to await a Promise. The process hangs forever."
+        ];
+        
+        const randomMsg = reasons[Math.floor(Math.random() * reasons.length)];
+        document.getElementById('go-reason').innerText = randomMsg;
+        screen.querySelector('button').innerText = "TRY AGAIN";
+    },
+
+    victory: function() {
+        this.state = 'GAMEOVER';
+        document.getElementById('ui-layer').style.display = 'none';
+        document.getElementById('health-overlay').style.display = 'none';
+        
+        AudioSys.playMarseillaise();
+        
+        const screen = document.getElementById('game-over-screen');
+        screen.style.display = 'flex';
+        
+        // Style for Victory
+        const h1 = screen.querySelector('h1');
+        h1.innerText = "VICTOIRE!";
+        h1.style.color = '#2ecc71'; // Green
+        
+        document.getElementById('go-killer').innerText = "Louis reached the exit!";
+        document.getElementById('go-reason').innerText = "Vive la France! The weekend has officially started. Enjoy your freedom.";
+        
+        screen.querySelector('button').innerText = "PLAY AGAIN";
+    },
+
+    restart: function() {
+        this.player.hp = 100;
+        this.player.x = 2; 
+        this.player.y = 7;
+        
+        // Reset enemies
+        this.mapEnemies.forEach(e => {
+            e.defeated = false;
+            // Reset positions
+            if(e.id === 'andrew') { e.x = 15; e.y = 7; }
+            if(e.id === 'piero') { e.x = 30; e.y = 7; }
+            if(e.id === 'marco') { e.x = 45; e.y = 7; }
+        });
+        
+        this.battle.enemy = null;
+        this.battle.turn = 'PLAYER';
+        this.state = 'MAP';
+        
+        document.getElementById('game-over-screen').style.display = 'none';
+        
+        this.updateCamera();
+        this.drawMap();
+    },
+
+    nextTurn: function(playerMsg, playerDmg) {
+        this.updateHealthUI();
+        this.logText(playerMsg);
+        document.getElementById('battle-controls').style.display = 'none';
+        document.getElementById('dialog-text').style.display = 'block';
+        this.battle.turn = 'ENEMY';
+        setTimeout(() => { this.enemyTurn(); }, 2000);
+    },
+
+    endBattle: function(fled) {
+        // Mark enemy as defeated
+        const defeatedEnemy = this.mapEnemies.find(e => e.id === this.battle.enemy.id);
+        if (defeatedEnemy) defeatedEnemy.defeated = true;
+
+        this.state = 'MAP';
+        document.getElementById('ui-layer').style.display = 'none';
+        document.getElementById('health-overlay').style.display = 'none';
+        
+        // Check Victory
+        const allDefeated = this.mapEnemies.every(e => e.defeated);
+        if (allDefeated) {
+            AudioSys.playMarseillaise();
+            setTimeout(() => {
+                alert("VICTOIRE! Louis exits the building. Vive la France!");
+            }, 500);
+        } else {
+            AudioSys.win();
+        }
+    },
+
+    updateHealthUI: function() {
+        const e = this.battle.enemy;
+        const p = this.player;
+        document.getElementById('enemy-name').innerText = e.name;
+        document.getElementById('enemy-hp-bar').style.width = (Math.max(0, e.hp) / e.maxHp * 100) + '%';
+        document.getElementById('player-hp-text').innerText = `${Math.floor(Math.max(0, p.hp))}/${p.maxHp} SANITY`;
+        document.getElementById('player-hp-bar').style.width = (Math.max(0, p.hp) / p.maxHp * 100) + '%';
+    },
+
+    logText: function(text) {
+        const dialog = document.getElementById('dialog-text');
+        dialog.innerText = text;
+        dialog.style.display = 'block';
+    },
+
+    drawMap: function() {
+        this.ctx.fillStyle = '#111';
+        this.ctx.fillRect(0, 0, 640, 480);
+        
+        // Calculate visible range
+        const startCol = Math.floor(this.camera.x / TILE_SIZE);
+        const endCol = startCol + (640 / TILE_SIZE) + 1;
+        const startRow = Math.floor(this.camera.y / TILE_SIZE);
+        const endRow = startRow + (480 / TILE_SIZE) + 1;
+
+        const offsetX = -this.camera.x;
+        const offsetY = -this.camera.y;
+
+        for(let y = startRow; y <= endRow; y++) {
+            for(let x = startCol; x <= endCol; x++) {
+                if (y >= MAP_HEIGHT || x >= MAP_WIDTH) continue;
+
+                const type = MAP_DATA[y][x];
+                const px = Math.floor(x * TILE_SIZE + offsetX);
+                const py = Math.floor(y * TILE_SIZE + offsetY);
+                
+                if(type === 0) SPRITES.floor(this.ctx, px, py);
+                else if(type === 1) SPRITES.wall(this.ctx, px, py);
+                else if(type === 2) SPRITES.desk(this.ctx, px, py);
+                else if(type === 4) SPRITES.plant(this.ctx, px, py);
+                else if(type === 5) SPRITES.cooler(this.ctx, px, py);
+                else if(type === 9) SPRITES.door(this.ctx, px, py);
+            }
+        }
+        
+        // Draw Enemies relative to camera
+        this.mapEnemies.forEach(e => {
+            if (!e.defeated) {
+                const ex = Math.floor(e.x * TILE_SIZE + offsetX);
+                const ey = Math.floor(e.y * TILE_SIZE + offsetY);
+                
+                // Only draw if visible
+                if (ex > -TILE_SIZE && ex < 640 && ey > -TILE_SIZE && ey < 480) {
+                    if (e.id === 'andrew') SPRITES.andrew_map(this.ctx, ex, ey);
+                    if (e.id === 'piero') SPRITES.piero_map(this.ctx, ex, ey);
+                    if (e.id === 'marco') SPRITES.marco_map(this.ctx, ex, ey);
+
+                    // Aggro Indicator (!)
+                    const dist = Math.abs(this.player.x - e.x) + Math.abs(this.player.y - e.y);
+                    if (dist < 6) {
+                        this.ctx.fillStyle = '#e74c3c'; // Red
+                        this.ctx.font = 'bold 20px "Fira Code"';
+                        this.ctx.fillText("!", ex + 15, ey - 5);
+                    }
+                }
+            }
+        });
+
+        // Draw Player relative to camera
+        const plx = Math.floor(this.player.x * TILE_SIZE + offsetX);
+        const ply = Math.floor(this.player.y * TILE_SIZE + offsetY);
+        SPRITES.louis_map(this.ctx, plx, ply);
+    },
+
+    drawBattle: function() {
+        this.ctx.fillStyle = '#2c3e50';
+        this.ctx.fillRect(0, 0, 640, 480);
+        this.ctx.fillStyle = '#95a5a6';
+        this.ctx.beginPath();
+        this.ctx.ellipse(320, 350, 280, 100, 0, 0, Math.PI*2);
+        this.ctx.fill();
+        drawBattleSprite(this.ctx, 'louis', 80, 200, 10);
+        drawBattleSprite(this.ctx, this.battle.enemy.id, 420, 50, 8);
+    },
+
+    loop: function() {
+        if (Game.state === 'MAP') {
+            Game.updateEnemies(); // Update AI
+            Game.drawMap();
+        } else if (Game.state === 'TRANSITION') {
+            Game.battle.transitionTimer--;
+            Game.drawTransition();
+            if(Game.battle.transitionTimer <= 0) Game.startBattle();
+        } else if (Game.state === 'BATTLE') {
+            Game.drawBattle();
+        }
+        requestAnimationFrame(Game.loop);
+    }
+};
+
+Game.init();
+</script>
+</body>
+</html>
